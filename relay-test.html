@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>中繼伺服器測試</title>
+  <style>
+    body { margin: 0; padding: 16px; font-family: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif; font-size: 17px; line-height: 1.6; color: #18212b; background: #f4f5f3; }
+    main { max-width: 560px; margin: 0 auto; }
+    h1 { font-size: 1.2rem; }
+    label { display: block; margin: 16px 0 6px; color: #5b6672; }
+    input { width: 100%; box-sizing: border-box; min-height: 48px; padding: 0 12px; border: 1px solid #dde1e4; border-radius: 12px; font: inherit; }
+    button { margin-top: 12px; min-height: 48px; padding: 0 22px; border: 0; border-radius: 12px; background: #0b6e69; color: #fff; font: inherit; font-weight: 600; }
+    .box { margin-top: 18px; padding: 14px; border-radius: 12px; background: #fff; border: 1px solid #dde1e4; white-space: pre-line; overflow-wrap: anywhere; }
+    .muted { color: #5b6672; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>中繼伺服器測試</h1>
+  <p class="muted">輸入一個地址按「查詢」，確認中繼伺服器能幫忙查到位置。每查一次都會算進今天的 300 次裡。</p>
+  <label for="address">地址</label>
+  <input id="address" type="text" placeholder="例如：臺北市萬華區漢中街2號">
+  <button type="button" id="go">查詢</button>
+  <p class="box muted" data-testid="usage" id="usage">今天已用次數：讀取中…</p>
+  <div class="box" data-testid="result" id="result">還沒查詢。</div>
+</main>
+<script src="js/config.js"></script>
+<script>
+(function () {
+  'use strict';
+  var relay = (window.__RELAY_URL_FOR_TEST__ || (window.ROUTE_CONFIG && window.ROUTE_CONFIG.relayUrl) || '').replace(/\/$/, '');
+  var resultEl = document.getElementById('result');
+  var usageEl = document.getElementById('usage');
+
+  function showUsage(used, limit) { usageEl.textContent = '今天已用 ' + used + ' / ' + limit + ' 次'; }
+
+  function describe(status, body) {
+    if (body.status === 'ok') {
+      return (body.precision === 'house' ? '找到門牌' : '只找到大概位置') + '\n緯度 ' + body.lat + '\n經度 ' + body.lng;
+    }
+    if (body.status === 'notfound') return '找不到這個地址。';
+    if (body.status === 'limit') return '今天的查詢次數已用完，明天（臺灣時間）恢復。';
+    if (body.reason === 'missing-key') return '查詢失敗：Cloudflare 上還沒存地址查詢的金鑰（GOOGLE_GEOCODING_KEY）。';
+    if (body.reason === 'missing-counter') return '查詢失敗：Cloudflare 上還沒連結記次數的資料存放（COUNTER）。';
+    return '查詢失敗（' + (body.reason || status) + '）。';
+  }
+
+  function call(path) {
+    return fetch(relay + path).then(function (response) {
+      return response.json().catch(function () { return {}; }).then(function (body) { return { status: response.status, body: body }; });
+    });
+  }
+
+  if (!relay || relay.indexOf('REPLACE_') === 0) {
+    usageEl.textContent = '還沒設定中繼伺服器的網址（js/config.js 的 relayUrl）。';
+  } else {
+    call('/usage').then(function (r) { if (r.body.status === 'usage') showUsage(r.body.used, r.body.limit); })
+      .catch(function () { usageEl.textContent = '連不上中繼伺服器。'; });
+  }
+
+  document.getElementById('go').addEventListener('click', function () {
+    var address = document.getElementById('address').value.trim();
+    if (!address) { resultEl.textContent = '請先輸入地址。'; return; }
+    resultEl.textContent = '查詢中…';
+    call('/geocode?address=' + encodeURIComponent(address)).then(function (r) {
+      resultEl.textContent = describe(r.status, r.body);
+      if (r.body.used !== undefined) showUsage(r.body.used, r.body.limit);
+    }).catch(function () {
+      resultEl.textContent = '連不上中繼伺服器，請確認網址和網路。';
+    });
+  });
+})();
+</script>
+</body>
+</html>

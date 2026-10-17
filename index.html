@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>送貨路線小幫手</title>
+  <!-- 改版時把所有 ?v= 後面的數字一起加一，手機才會整批換成新檔。 -->
+  <link rel="stylesheet" href="styles.css?v=27">
+  <link rel="manifest" href="manifest.webmanifest?v=27">
+  <link rel="icon" href="icons/icon-192.png?v=27">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=27">
+  <meta name="theme-color" content="#0b6e69">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="送貨路線小幫手">
+</head>
+<body>
+  <header class="topbar">
+    <h1>送貨路線小幫手</h1>
+    <p class="count" data-testid="item-count" aria-live="polite">共 0 件</p>
+  </header>
+
+  <main class="layout">
+    <section class="map-panel" aria-label="地圖">
+      <div id="map" data-testid="map"></div>
+      <button type="button" class="btn small map-toggle" id="map-toggle">放大地圖</button>
+      <p id="map-file-notice" class="map-fallback" data-testid="map-file-notice" hidden>現在是直接用檔案打開，地圖不會顯示。工具放上網址後，從網址打開就會出現地圖。清單的功能不受影響。</p>
+      <div id="pick-banner" class="pick-banner" data-testid="pick-banner" role="status" hidden>
+        <span id="pick-text"></span>
+        <button type="button" class="btn" id="pick-cancel">取消</button>
+      </div>
+      <p id="map-fallback" class="map-fallback" data-testid="map-fallback" hidden>地圖載入不了，請確認網路連線後重新整理。清單仍然可以使用。</p>
+    </section>
+
+    <section class="list-panel" aria-label="檢查清單">
+      <div class="city-setting">
+        <label for="default-city">沒寫縣市時當成</label>
+        <select id="default-city">
+          <option value="臺北市">臺北市</option>
+          <option value="新北市">新北市</option>
+          <option value="基隆市">基隆市</option>
+          <option value="桃園市">桃園市</option>
+        </select>
+      </div>
+      <div class="start-setting" data-testid="start-setting">
+        <span id="start-text"></span>
+        <button type="button" class="btn small" id="store-adjust">在地圖上調整</button>
+      </div>
+      <section id="deliver" class="deliver" data-testid="deliver" aria-label="送貨中" hidden>
+        <div class="deliver-top">
+          <button type="button" class="btn small" id="deliver-exit">回到清單</button>
+          <button type="button" class="progress-btn" id="deliver-progress" data-testid="deliver-progress"></button>
+        </div>
+        <div id="deliver-body"></div>
+        <div id="undo-toast" class="undo-toast" data-testid="undo-toast" role="status" hidden>
+          <span id="undo-text"></span>
+          <button type="button" class="btn small" id="undo-btn">復原</button>
+        </div>
+        <nav id="deliver-actions" class="deliver-actions" data-testid="deliver-actions" aria-label="送貨按鈕">
+          <a id="nav-link" class="btn big" target="_blank" rel="noopener">導航</a>
+          <button type="button" class="btn big" id="later-btn">待補送</button>
+          <button type="button" class="btn big primary" id="next-btn">下一站</button>
+        </nav>
+      </section>
+      <p id="relay-usage" class="relay-usage" data-testid="relay-usage" aria-live="polite" hidden></p>
+      <div class="list-head">
+        <h2>檢查清單</h2>
+        <div class="head-buttons">
+          <button type="button" class="btn primary" id="import-btn">匯入截圖</button>
+          <button type="button" class="btn" id="add-btn">新增一件</button>
+        </div>
+      </div>
+      <input type="file" id="import-file" accept="image/*" multiple hidden>
+      <section id="import-status" class="import-status" data-testid="import-status" role="status" aria-label="匯入截圖" hidden>
+        <p id="import-progress" class="import-progress"></p>
+        <div id="import-result" data-testid="import-result" hidden></div>
+      </section>
+      <div id="plan-actions" class="plan-actions" hidden>
+        <button type="button" class="btn primary wide go" id="deliver-btn" hidden>開始送貨</button>
+        <button type="button" class="btn primary wide" id="plan-btn">開始排路線</button>
+        <button type="button" class="btn small link" id="plan-here-btn">改從我現在的位置出發</button>
+      </div>
+      <p id="plan-status" class="plan-status" role="status" hidden></p>
+      <div id="start-choice" class="start-choice" data-testid="start-choice" role="alert" hidden>
+        <p id="start-choice-text"></p>
+        <div class="start-actions">
+          <button type="button" class="btn primary" id="use-last-start">用上次的起點</button>
+          <button type="button" class="btn" id="pick-start">在地圖上點一下起點</button>
+          <button type="button" class="btn" id="start-cancel">取消</button>
+        </div>
+      </div>
+      <div id="replan-hint" class="replan-hint" data-testid="replan-hint" role="status" hidden>
+        <span>清單有變動，要重新排嗎？新的站先接在最後面。</span>
+        <button type="button" class="btn" id="replan-btn">重新排路線</button>
+      </div>
+      <p id="save-warning" class="save-warning" data-testid="save-warning" role="alert" hidden>這台裝置目前存不了資料，關掉網頁後清單會不見。請確認不是用無痕視窗，或清出一些空間。</p>
+      <p id="empty-hint" class="empty-hint">還沒有任何一件。按「新增一件」開始。</p>
+      <p id="attention-count" class="attention-count" data-testid="attention-count" aria-live="polite" hidden></p>
+      <section id="attention" class="attention-group" data-testid="needs-attention" aria-label="要處理的地址" hidden>
+        <h3>要處理的地址</h3>
+        <ol id="attention-list" class="item-list"></ol>
+      </section>
+      <ol id="item-list" class="item-list"></ol>
+      <button type="button" class="btn new-trip" id="new-trip-btn" hidden>開始新的一趟</button>
+      <p class="data-credit" data-testid="data-credit">地址查詢與地圖：Google 地圖</p>
+    </section>
+  </main>
+
+  <dialog id="typo-dialog" class="sheet" data-testid="typo-dialog" aria-labelledby="typo-title">
+    <h2 id="typo-title">地址好像有打錯</h2>
+    <p class="typo-address" id="typo-address"></p>
+    <ul class="typo-reasons" id="typo-reasons"></ul>
+    <div class="sheet-actions">
+      <button type="button" class="btn" id="typo-save">照樣儲存</button>
+      <button type="button" class="btn primary" id="typo-back">回去改</button>
+    </div>
+  </dialog>
+
+  <dialog id="all-stops" class="sheet" data-testid="all-stops" aria-label="全部站">
+    <h2>全部站</h2>
+    <ol id="all-stop-list" class="all-stop-list"></ol>
+    <div class="sheet-actions">
+      <button type="button" class="btn" id="all-close">關閉</button>
+    </div>
+  </dialog>
+
+  <dialog id="item-dialog" class="sheet" aria-labelledby="dialog-title">
+    <form id="item-form" method="dialog" novalidate>
+      <h2 id="dialog-title">新增一件</h2>
+      <label class="field">
+        <span>地址</span>
+        <input id="f-address" name="address" type="text" autocomplete="off" required placeholder="例如：中山路一段100號3樓">
+      </label>
+      <p id="address-error" class="field-error" role="alert" hidden>請填地址。</p>
+      <label class="field">
+        <span>類型</span>
+        <select id="f-type" name="type">
+          <option value="home">住家</option>
+          <option value="office">辦公室</option>
+        </select>
+      </label>
+      <label class="field">
+        <span>可送達時段</span>
+        <input id="f-window" name="timeWindow" type="text" autocomplete="off" list="window-options" placeholder="例如：全天 08:00-22:00">
+      </label>
+      <datalist id="window-options">
+        <option value="全天 08:00-22:00"></option>
+        <option value="白天 08:00-18:00"></option>
+        <option value="平日白天 08:00-18:00"></option>
+      </datalist>
+      <label class="field">
+        <span>訂單編號</span>
+        <input id="f-order" name="orderNo" type="text" autocomplete="off" autocapitalize="characters" placeholder="TW 開頭那一組">
+      </label>
+      <div class="sheet-actions">
+        <button type="button" class="btn" id="cancel-btn">取消</button>
+        <button type="submit" class="btn primary">儲存</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="js/config.js?v=27"></script>
+  <script src="js/store.js?v=27"></script>
+  <script src="js/address.js?v=27"></script>
+  <script src="js/geocoder.js?v=27"></script>
+  <script src="js/map.js?v=27"></script>
+  <script src="js/route.js?v=27"></script>
+  <script src="js/deliver.js?v=27"></script>
+  <script src="js/importer.js?v=27"></script>
+  <script src="js/ocr.js?v=27"></script>
+  <script src="js/app.js?v=27"></script>
+</body>
+</html>

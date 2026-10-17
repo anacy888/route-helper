@@ -1,0 +1,9 @@
+{
+  "name": "shopee-route-helper",
+  "private": true,
+  "version": "0.1.0",
+  "description": "送貨路線小幫手",
+  "scripts": {
+    "test": "node --test tests/*.test.js tests/*.test.mjs"
+  }
+}
